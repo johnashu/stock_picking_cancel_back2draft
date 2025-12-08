@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_stock_picking_cancel_back2draft" model="res.groups">
+        <field name="name">Cancel &amp; Back to Draft Pickings</field>
+        <field name="category_id" ref="base.module_category_hidden" />
+        <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]" />
+        <field name="comment">Users in this group can cancel pickings and set them back to draft
+            state.</field>
+    </record>
+</odoo>
