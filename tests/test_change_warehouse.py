@@ -13,7 +13,7 @@ class TestChangeWarehouse(TransactionCase):
     correctly at scale.
     """
 
-    NUM_ORDERS = 10
+    NUM_ORDERS = 100
     SERIALS_PER_ORDER = 10
 
     @classmethod
