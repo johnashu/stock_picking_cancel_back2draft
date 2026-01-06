@@ -189,13 +189,30 @@ class TestChangeWarehouse(TransactionCase):
         self.assertEqual(pick.group_id, original_group)
         self.assertEqual(ship.group_id, original_group)
 
-    def test_change_warehouse_fails_on_confirmed_picking(self):
-        """Test that changing warehouse fails on confirmed (not draft) picking."""
+    def test_change_warehouse_on_confirmed_picking(self):
+        """Test that changing warehouse works on confirmed picking (auto-cancels first)."""
         pick, ship = self._create_two_step_delivery(self.warehouse1)
 
-        # Try to open wizard on confirmed picking
-        with self.assertRaises(UserError):
-            pick.action_open_change_warehouse_wizard()
+        # Verify picking is confirmed
+        self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
+
+        # Open wizard on confirmed picking - should work now
+        action = pick.action_open_change_warehouse_wizard()
+        self.assertEqual(action["res_model"], "stock.picking.change.warehouse")
+
+        # Create wizard and execute
+        wizard = self.env["stock.picking.change.warehouse"].with_context(
+            active_ids=[pick.id],
+            active_model="stock.picking",
+        ).create({
+            "new_warehouse_id": self.warehouse2.id,
+            "include_chained_pickings": True,
+        })
+        wizard.action_change_warehouse()
+
+        # Verify pickings were updated and confirmed
+        self.assertEqual(pick.picking_type_id, self.warehouse2.pick_type_id)
+        self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
 
     def test_change_warehouse_without_chained(self):
         """Test changing warehouse without including chained pickings."""
@@ -216,8 +233,8 @@ class TestChangeWarehouse(TransactionCase):
         # Verify only pick is included (not ship, though it will likely be in chained)
         self.assertEqual(wizard.picking_count, 1)
 
-    def test_reconfirm_after_warehouse_change(self):
-        """Test that pickings can be re-confirmed after warehouse change."""
+    def test_pickings_confirmed_after_warehouse_change(self):
+        """Test that pickings are automatically confirmed after warehouse change."""
         pick, ship = self._create_two_step_delivery(self.warehouse1)
 
         # Cancel and reset
@@ -233,11 +250,7 @@ class TestChangeWarehouse(TransactionCase):
         })
         wizard.action_change_warehouse()
 
-        # Re-confirm pickings
-        pick.action_confirm()
-        ship.action_confirm()
-
-        # Verify states
+        # Verify pickings are automatically confirmed (marked as "To Do")
         self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
         self.assertIn(ship.state, ("confirmed", "waiting"))
 

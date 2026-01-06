@@ -6,18 +6,18 @@ class StockPicking(models.Model):
     _inherit = "stock.picking"
 
     def action_open_change_warehouse_wizard(self):
-        """Open the Change Warehouse wizard for draft/cancelled pickings."""
+        """Open the Change Warehouse wizard.
+
+        This will automatically cancel and set pickings back to draft if needed,
+        then open the wizard to change the warehouse.
+        """
         self._check_cancel_back_to_draft_allowed()
 
-        # Validate pickings are in correct state
-        invalid_pickings = self.filtered(lambda p: p.state not in ("draft", "cancel"))
-        if invalid_pickings:
+        # Check for done pickings - these cannot be changed
+        done_pickings = self.filtered(lambda p: p.state == "done")
+        if done_pickings:
             raise UserError(
-                _(
-                    "Only pickings in 'Draft' or 'Cancelled' state can have their warehouse changed.\n"
-                    "Please use 'Cancel & Back to Draft' first for: %s"
-                )
-                % ", ".join(invalid_pickings.mapped("name"))
+                _("Cannot change warehouse for completed pickings: %s") % ", ".join(done_pickings.mapped("name"))
             )
 
         return {

@@ -19,22 +19,20 @@
                 </group>
                 <group string="Pickings to Update">
                     <field name="chained_picking_ids" nolabel="1" colspan="2">
-                        <list>
+                        <tree>
                             <field name="name" />
                             <field name="picking_type_id" />
                             <field name="location_id" />
                             <field name="location_dest_id" />
                             <field name="state" />
-                        </list>
+                        </tree>
                     </field>
                 </group>
                 <separator />
                 <div class="alert alert-info" role="alert">
-                    <strong>Note:</strong> This will update the warehouse, operation type, and locations
-                    for all selected pickings. The chain links between Pick and Out operations will be preserved.
-                    <br/><br/>
-                    <strong>Important:</strong> Pickings must be in 'Draft' or 'Cancelled' state.
-                    Use "Cancel &amp; Back to Draft" first if needed.
+                    <strong>Note:</strong> This will cancel the pickings, reset them to draft, 
+                    update the warehouse/operation type/locations, and then confirm them as "To Do".
+                    The chain links between Pick and Out operations will be preserved.
                 </div>
                 <footer>
                     <button name="action_change_warehouse"

@@ -105,7 +105,14 @@ class StockPickingChangeWarehouse(models.TransientModel):
         return all_pickings
 
     def action_change_warehouse(self):
-        """Change warehouse for selected pickings and optionally chained pickings."""
+        """Change warehouse for selected pickings and optionally chained pickings.
+        
+        This will:
+        1. Cancel pickings (if not already cancelled)
+        2. Set pickings back to draft
+        3. Change the warehouse
+        4. Confirm pickings to mark them as "To Do"
+        """
         self.ensure_one()
 
         if not self.new_warehouse_id:
@@ -116,21 +123,28 @@ class StockPickingChangeWarehouse(models.TransientModel):
 
         pickings = self.chained_picking_ids if self.include_chained_pickings else self.picking_ids
 
-        # Validate all pickings are in draft or cancel state
-        invalid_pickings = pickings.filtered(lambda p: p.state not in ("draft", "cancel"))
-        if invalid_pickings:
+        # Check for done pickings - these cannot be changed
+        done_pickings = pickings.filtered(lambda p: p.state == "done")
+        if done_pickings:
             raise UserError(
                 _(
-                    "All pickings must be in 'Draft' or 'Cancelled' state. "
-                    "Please use 'Cancel & Back to Draft' first.\n\n"
-                    "Invalid pickings: %s"
+                    "Cannot change warehouse for completed pickings: %s"
                 )
-                % ", ".join(invalid_pickings.mapped("name"))
+                % ", ".join(done_pickings.mapped("name"))
             )
+
+        # Cancel and set to draft any pickings that are not already in draft/cancel state
+        pickings_to_reset = pickings.filtered(lambda p: p.state not in ("draft", "cancel"))
+        if pickings_to_reset:
+            pickings_to_reset.action_cancel_back_to_draft()
 
         # Change warehouse for each picking
         for picking in pickings:
             self._update_picking_warehouse(picking, self.new_warehouse_id)
+
+        # Confirm pickings to mark them as "To Do"
+        # This moves them from draft to confirmed/waiting state
+        pickings.action_confirm()
 
         # Return action to show updated pickings
         if len(pickings) == 1:

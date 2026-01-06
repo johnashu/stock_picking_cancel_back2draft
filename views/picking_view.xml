@@ -8,35 +8,14 @@
         <field name="arch" type="xml">
             <xpath expr="//button[@name='action_cancel']" position="after">
                 <button
-                    name="action_cancel_back_to_draft"
-                    invisible="state in ('draft', 'done')"
-                    string="Cancel &amp; Back to draft"
-                    groups="stock_picking_cancel_back2draft.group_stock_picking_cancel_back2draft"
-                    type="object"
-                    class="btn-secondary"
-                />
-                <button
                     name="action_open_change_warehouse_wizard"
-                    invisible="state not in ('draft', 'cancel')"
+                    invisible="state == 'done'"
                     string="Change Warehouse"
                     groups="stock_picking_cancel_back2draft.group_stock_picking_cancel_back2draft"
                     type="object"
                     class="btn-secondary"
                 />
             </xpath>
-        </field>
-    </record>
-
-    <!-- Server Action for List View -->
-    <record id="action_picking_cancel_back_to_draft" model="ir.actions.server">
-        <field name="name">Cancel &amp; Back to Draft</field>
-        <field name="model_id" ref="stock.model_stock_picking" />
-        <field name="binding_model_id" ref="stock.model_stock_picking" />
-        <field name="binding_view_types">list</field>
-        <field name="groups_id" eval="[Command.link(ref('stock_picking_cancel_back2draft.group_stock_picking_cancel_back2draft'))]"/>
-        <field name="state">code</field>
-        <field name="code">
-            if records: records.action_cancel_back_to_draft()
         </field>
     </record>
 </odoo>
