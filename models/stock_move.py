@@ -12,6 +12,16 @@ class StockMove(models.Model):
         and changing procure_method. This allows cancelling moves while retaining
         the chain for later reuse (e.g., warehouse change in 2-step process).
         """
+        import logging
+
+        _logger = logging.getLogger(__name__)
+        _logger.info(
+            "_action_cancel called on moves: %s, states: %s, preserve_move_chain: %s",
+            self.ids,
+            self.mapped("state"),
+            self.env.context.get("preserve_move_chain"),
+        )
+
         if not self.env.context.get("preserve_move_chain"):
             return super()._action_cancel()
 
@@ -25,12 +35,15 @@ class StockMove(models.Model):
             )
 
         moves_to_cancel = self.filtered(lambda m: m.state != "cancel" and not (m.state == "done" and m.scrapped))
+        _logger.info("moves_to_cancel: %s, states before: %s", moves_to_cancel.ids, moves_to_cancel.mapped("state"))
+
         moves_to_cancel.picked = False
         # Also clear picked on move lines so _do_unreserve can unlink them
         moves_to_cancel.move_line_ids.picked = False
         moves_to_cancel._do_unreserve()
 
         moves_to_cancel.state = "cancel"
+        _logger.info("moves_to_cancel states after: %s", moves_to_cancel.mapped("state"))
 
         # Handle propagate_cancel but preserve chains
         for move in moves_to_cancel:
@@ -57,7 +70,18 @@ class StockMove(models.Model):
         upstream chain links (move_orig_ids), ensuring the chain works correctly
         when the picking is re-confirmed.
         """
-        if self.filtered(lambda m: m.state != "cancel"):
+        import logging
+
+        _logger = logging.getLogger(__name__)
+
+        non_cancelled = self.filtered(lambda m: m.state != "cancel")
+        if non_cancelled:
+            _logger.warning(
+                "action_back_to_draft called with non-cancelled moves: %s, states: %s, pickings: %s",
+                non_cancelled.ids,
+                non_cancelled.mapped("state"),
+                non_cancelled.mapped("picking_id.name"),
+            )
             raise UserError(_("You can set to draft cancelled moves only"))
 
         # Restore procure_method for moves with chain links

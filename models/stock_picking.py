@@ -92,9 +92,14 @@ class StockPicking(models.Model):
         moves.action_back_to_draft()
 
         # Also set destination moves back to draft if they were cancelled as part of this operation
+        # Exclude moves already handled above (moves that are part of self's pickings)
         if cancelled_dest_move_ids:
-            cancelled_dest_moves = self.env["stock.move"].browse(cancelled_dest_move_ids)
-            cancelled_dest_moves.action_back_to_draft()
+            # Remove move IDs that were already processed above
+            already_processed_ids = set(moves.ids)
+            remaining_dest_move_ids = [mid for mid in cancelled_dest_move_ids if mid not in already_processed_ids]
+            if remaining_dest_move_ids:
+                cancelled_dest_moves = self.env["stock.move"].browse(remaining_dest_move_ids)
+                cancelled_dest_moves.action_back_to_draft()
 
     def _check_cancel_back_to_draft_allowed(self):
         """Check if the current user has permission to cancel and set pickings back to draft."""
