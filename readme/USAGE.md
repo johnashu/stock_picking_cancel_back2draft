@@ -1,1 +1,1 @@
-Just open a  picking not in don or cancelled and click on 'cancel & back to draft' button
+Open a picking (any state except "Done") and click the "Change Warehouse" button. Select the new warehouse, choose whether to include chained pickings, and click "Change Warehouse" to execute. The system will automatically cancel, reset to draft, update locations, and confirm the pickings.

@@ -1,5 +1,3 @@
-# Modified from Stock back 2 draft by OCA.
-# Original code: https://github.com/OCA/stock-logistics-workflow
 # © 2025 SJR Nebula
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
@@ -148,3 +146,100 @@ class TestPickingCancelBackToDraft(TransactionCase):
         picking_as_user = picking.with_user(self.cancel_draft_user)
         picking_as_user.action_cancel_back_to_draft()
         self.assertEqual(picking.state, "draft")
+
+    def test_cancel_back_to_draft_with_picked_move_lines(self):
+        """Test cancel_back_to_draft works when move lines have picked=True.
+
+        This tests the fix where move lines with picked=True (e.g., receipts with
+        assigned serial numbers) weren't being properly unreserved during cancel.
+        """
+        # Create a serial-tracked product
+        # Create via template to avoid field issues with product.product
+        serial_template = self.env["product.template"].create(
+            {
+                "name": "Test Serial Product",
+                "detailed_type": "product",
+                "tracking": "serial",
+                "sale_line_warn": "no-message",
+            }
+        )
+        serial_product = serial_template.product_variant_id
+
+        supplier_location = self.env.ref("stock.stock_location_suppliers")
+        warehouse = self.env["stock.warehouse"].search([], limit=1)
+
+        # Create a receipt
+        receipt = self.env["stock.picking"].create(
+            {
+                "picking_type_id": warehouse.in_type_id.id,
+                "location_id": supplier_location.id,
+                "location_dest_id": warehouse.lot_stock_id.id,
+            }
+        )
+        receipt_move = self.env["stock.move"].create(
+            {
+                "name": serial_product.name,
+                "picking_id": receipt.id,
+                "product_id": serial_product.id,
+                "product_uom_qty": 3.0,
+                "product_uom": serial_product.uom_id.id,
+                "location_id": supplier_location.id,
+                "location_dest_id": warehouse.lot_stock_id.id,
+            }
+        )
+
+        receipt.action_confirm()
+
+        # Clear any auto-created move lines before adding our serials
+        receipt_move.move_line_ids.unlink()
+
+        # Create serial numbers and assign them (simulating user scanning serials)
+        for i in range(3):
+            lot = self.env["stock.lot"].create(
+                {
+                    "name": f"SN-PICKED-{i+1}",
+                    "product_id": serial_product.id,
+                    "company_id": warehouse.company_id.id,
+                }
+            )
+            self.env["stock.move.line"].create(
+                {
+                    "move_id": receipt_move.id,
+                    "picking_id": receipt.id,
+                    "product_id": serial_product.id,
+                    "product_uom_id": serial_product.uom_id.id,
+                    "location_id": supplier_location.id,
+                    "location_dest_id": warehouse.lot_stock_id.id,
+                    "lot_id": lot.id,
+                    "quantity": 1.0,
+                }
+            )
+
+        # Verify move lines exist and receipt is assigned
+        self.assertEqual(len(receipt_move.move_line_ids), 3)
+        self.assertEqual(receipt.state, "assigned")
+
+        # This is the critical test - should NOT raise an error
+        receipt.action_cancel_back_to_draft()
+
+        # Verify receipt is now draft
+        self.assertEqual(receipt.state, "draft")
+
+        # Verify move is draft
+        self.assertEqual(receipt_move.state, "draft")
+
+    def test_cancel_back_to_draft_assigned_picking_with_stock(self):
+        """Test cancel_back_to_draft on assigned picking with reserved stock."""
+        picking = self._create_picking()
+        self._add_stock(self.product, 10, self.src_location)
+        picking.action_confirm()
+        picking.action_assign()
+
+        self.assertEqual(picking.state, "assigned")
+        self.assertTrue(picking.move_ids.move_line_ids, "Should have reserved move lines")
+
+        # Cancel and set to draft
+        picking.action_cancel_back_to_draft()
+
+        self.assertEqual(picking.state, "draft")
+        self.assertFalse(picking.move_ids.move_line_ids, "Move lines should be removed after cancel")

@@ -1,1 +1,1 @@
-This module allows to bring picking that are not 'done' back to draft
+This module allows you to cancel pickings, reset them to draft, and change their warehouse with a single click. It preserves chain links between Pick and Out operations, ensuring serial numbers flow correctly through multi-step delivery and receipt workflows.

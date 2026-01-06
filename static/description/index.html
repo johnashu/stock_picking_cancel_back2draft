@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pickings cancel and back to draft</title>
+    <title>Stock Picking Cancel, Draft & Change Warehouse</title>
     <style type="text/css">
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -22,6 +22,10 @@
       h2 {
         color: #875a7b;
         margin-top: 2em;
+      }
+      h3 {
+        color: #666;
+        margin-top: 1.5em;
       }
       a {
         color: #00a09d;
@@ -57,22 +61,41 @@
         padding: 12px 15px;
         margin: 15px 0;
       }
+      .info {
+        background-color: #d1ecf1;
+        border-left: 4px solid #17a2b8;
+        padding: 12px 15px;
+        margin: 15px 0;
+      }
       .section {
         margin-bottom: 30px;
+      }
+      .feature-list {
+        background-color: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin: 15px 0;
+      }
+      .feature-list li {
+        margin-bottom: 10px;
+      }
+      .step-number {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        background-color: #875a7b;
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 24px;
+        font-size: 14px;
+        margin-right: 8px;
       }
     </style>
   </head>
   <body>
     <div class="document">
-      <h1>Pickings cancel and back to draft</h1>
-
-      <p>
-        Modified from Stock back 2 draft by OCA.<br />
-        Original code:
-        <a href="https://github.com/OCA/stock-logistics-workflow"
-          >https://github.com/OCA/stock-logistics-workflow</a
-        >
-      </p>
+      <h1>Stock Picking Cancel, Draft & Change Warehouse</h1>
 
       <p class="badge">
         <a href="http://www.gnu.org/licenses/agpl-3.0-standalone.html">
@@ -84,10 +107,59 @@
       </p>
 
       <p>
-        This module allows to cancel pickings and bring cancelled pickings back
-        to draft in 1 click. As long as the pickings are not in the 'done' or
-        'draft' state, the action will be available.
+        This module allows you to change the warehouse on pickings with a
+        <strong>single click</strong>. The "Change Warehouse" action will
+        automatically:
       </p>
+
+      <ol>
+        <li>Cancel the picking (if not already cancelled)</li>
+        <li>Reset it to draft state</li>
+        <li>Update the warehouse, operation type, and locations</li>
+        <li>Confirm the picking as "To Do"</li>
+      </ol>
+
+      <div class="info">
+        <strong>Key Benefit:</strong> This is especially useful for 2-step or
+        3-step delivery/receipt workflows where you need to reassign pickings to
+        a different warehouse while preserving the chain links between Pick and
+        Out operations. Serial numbers flow correctly through the chain after
+        warehouse change.
+      </div>
+
+      <div class="section" id="features">
+        <h2>Features</h2>
+        <ul class="feature-list">
+          <li>
+            <strong>Single-click operation:</strong> No need to manually cancel
+            and reset pickings first
+          </li>
+          <li>
+            <strong>Chain preservation:</strong> Pick ↔ Out chain links are
+            maintained
+          </li>
+          <li>
+            <strong>Serial number flow:</strong> Serial numbers flow correctly
+            through the chain after warehouse change
+          </li>
+          <li>
+            <strong>Automatic confirmation:</strong> Pickings are marked as "To
+            Do" after the change
+          </li>
+          <li>
+            <strong>Chained picking support:</strong> Optionally update all
+            linked pickings in the chain
+          </li>
+          <li>
+            <strong>Multi-step delivery support:</strong> Works with 2-step
+            (Pick + Ship) and 3-step workflows
+          </li>
+          <li>
+            <strong>Multi-step receipt support:</strong> Works with 2-step
+            (Receipt + Internal) workflows
+          </li>
+        </ul>
+      </div>
 
       <div class="section" id="installation">
         <h2>Installation</h2>
@@ -101,7 +173,8 @@
             List).
           </li>
           <li>
-            Search for "Pickings cancel and back to draft" and install it.
+            Search for "Stock Picking Cancel, Draft & Change Warehouse" and
+            install it.
           </li>
         </ol>
       </div>
@@ -109,8 +182,8 @@
       <div class="section" id="configuration">
         <h2>Configuration</h2>
         <p>
-          To allow users to cancel and bring pickings back to draft, you must
-          add them to the "Cancel &amp; Back to Draft Pickings" security group:
+          To allow users to change warehouse on pickings, you must add them to
+          the "Cancel &amp; Back to Draft Pickings" security group:
         </p>
         <ol>
           <li>Go to Settings &gt; Users &amp; Companies &gt; Users.</li>
@@ -128,20 +201,43 @@
 
       <div class="section" id="usage">
         <h2>Usage</h2>
-        <p>To cancel and bring a picking back to draft:</p>
+        <p>To change the warehouse on a picking:</p>
+        <ol>
+          <li>
+            <span class="step-number">1</span>Open a picking form view (any
+            state except "Done")
+          </li>
+          <li>
+            <span class="step-number">2</span>Click the
+            <strong>"Change Warehouse"</strong> button
+          </li>
+          <li>
+            <span class="step-number">3</span>In the wizard:
+            <ul>
+              <li>Select the new warehouse</li>
+              <li>
+                Choose whether to include chained pickings (Pick/Out chain)
+              </li>
+              <li>Review the pickings that will be updated</li>
+            </ul>
+          </li>
+          <li>
+            <span class="step-number">4</span>Click
+            <strong>"Change Warehouse"</strong> to execute
+          </li>
+        </ol>
+
+        <p>The system will automatically:</p>
         <ul>
-          <li>
-            In a pick form view, click on the 'Cancel &amp; Back to Draft'
-            button.
-          </li>
-          <li>
-            In a pick list view, select the pickings and choose the 'Cancel
-            &amp; Back to Draft' action from the action menu.
-          </li>
+          <li>Cancel the pickings (preserving chain links)</li>
+          <li>Reset them to draft</li>
+          <li>Update warehouse, operation type, and locations</li>
+          <li>Confirm them as "To Do"</li>
         </ul>
+
         <div class="note">
           <strong>Note:</strong> This action cannot be performed on pickings in
-          the "done" state.
+          the "Done" state.
         </div>
       </div>
 
@@ -165,20 +261,6 @@
         <h3>Contributors</h3>
         <ul>
           <li>John Ashurst</li>
-        </ul>
-
-        <h3>Original Authors</h3>
-        <ul>
-          <li>Agile Business Group</li>
-        </ul>
-
-        <h3>Original Contributors</h3>
-        <ul>
-          <li>Lorenzo Battistini &lt;lorenzo.battistini@agilebg.com&gt;</li>
-          <li>Iván Montagud &lt;ivan@studio73.es&gt;</li>
-          <li>Pimolnat Suntian &lt;pimolnats@ecosoft.co.th&gt;</li>
-          <li>David Montull Guasch &lt;david.montull@bt-group.com&gt;</li>
-          <li>Marwan Behillil &lt;marwan@riluxa.com&gt;</li>
         </ul>
       </div>
     </div>
