@@ -148,3 +148,266 @@ class TestPickingCancelBackToDraft(TransactionCase):
         picking_as_user = picking.with_user(self.cancel_draft_user)
         picking_as_user.action_cancel_back_to_draft()
         self.assertEqual(picking.state, "draft")
+
+    def test_two_step_delivery_via_procurement(self):
+        """Test 2-step delivery (Pick + Ship) created via procurement like a Sale Order.
+
+        This mimics how a Sale Order creates a 2-step delivery chain:
+        1. Set warehouse to 'pick_ship' (2-step delivery)
+        2. Run procurement to customer location using delivery route
+        3. Odoo creates: Pick (Stock -> Output) -> Ship (Output -> Customer)
+        4. Cancel the Ship, verify chain is preserved
+        """
+        warehouse = self.env["stock.warehouse"].search([], limit=1)
+
+        # Save original setting to restore later
+        original_delivery_steps = warehouse.delivery_steps
+
+        try:
+            # Configure warehouse for 2-step delivery (Pick + Ship)
+            warehouse.delivery_steps = "pick_ship"
+
+            # Create procurement group (like a sale order would)
+            procurement_group = self.env["procurement.group"].create(
+                {
+                    "name": "Test Sale Order",
+                }
+            )
+
+            # Get the delivery route
+            delivery_route = warehouse.delivery_route_id
+
+            # Run procurement - this is exactly what sale order does
+            ProcurementGroup = self.env["procurement.group"]
+            procurement = ProcurementGroup.Procurement(
+                self.product,
+                5.0,
+                self.product.uom_id,
+                self.cust_location,  # Destination: Customer
+                "Test Delivery",
+                "TEST/SALE/001",
+                warehouse.company_id,
+                {
+                    "group_id": procurement_group,
+                    "warehouse_id": warehouse,
+                    "route_ids": delivery_route,
+                },
+            )
+            ProcurementGroup.run([procurement])
+
+            # Find the created pickings
+            ship_picking = self.env["stock.picking"].search(
+                [
+                    ("group_id", "=", procurement_group.id),
+                    ("picking_type_id", "=", warehouse.out_type_id.id),
+                ]
+            )
+            pick_picking = self.env["stock.picking"].search(
+                [
+                    ("group_id", "=", procurement_group.id),
+                    ("picking_type_id", "=", warehouse.pick_type_id.id),
+                ]
+            )
+
+            self.assertEqual(len(ship_picking), 1, "Should have 1 Ship picking")
+            self.assertEqual(len(pick_picking), 1, "Should have 1 Pick picking")
+
+            ship_move = ship_picking.move_ids
+            pick_move = pick_picking.move_ids
+
+            # Verify chain was created by procurement
+            self.assertEqual(pick_move.move_dest_ids, ship_move)
+            self.assertEqual(ship_move.move_orig_ids, pick_move)
+            self.assertEqual(ship_move.procure_method, "make_to_order")
+
+            # Verify states
+            self.assertIn(ship_picking.state, ("confirmed", "waiting"))
+            self.assertIn(pick_picking.state, ("confirmed", "assigned", "waiting"))
+
+            # Cancel the Pick and set to draft - should cascade to Ship
+            pick_picking.action_cancel_back_to_draft()
+
+            # Verify both are now in draft
+            self.assertEqual(pick_picking.state, "draft")
+            self.assertEqual(ship_picking.state, "draft")
+
+            # CRITICAL: Verify chain links are preserved
+            self.assertEqual(
+                pick_move.move_dest_ids, ship_move, "Chain link pick_move.move_dest_ids should be preserved"
+            )
+            self.assertEqual(
+                ship_move.move_orig_ids, pick_move, "Chain link ship_move.move_orig_ids should be preserved"
+            )
+            self.assertEqual(ship_move.procure_method, "make_to_order", "procure_method should be preserved")
+
+        finally:
+            # Restore original warehouse setting
+            warehouse.delivery_steps = original_delivery_steps
+
+    def test_two_step_receipt_via_procurement(self):
+        """Test 2-step receipt (Input + Stock) created via procurement like a Purchase Order.
+
+        This mimics how a Purchase Order creates a 2-step receipt chain:
+        1. Set warehouse to 'two_steps' (2-step receipt)
+        2. Run procurement/create receipt from supplier
+        3. Odoo creates: Receipt (Supplier -> Input) -> Internal (Input -> Stock)
+        4. Cancel the Receipt, verify chain is preserved
+        """
+        warehouse = self.env["stock.warehouse"].search([], limit=1)
+        supplier_location = self.env.ref("stock.stock_location_suppliers")
+
+        # Save original setting to restore later
+        original_reception_steps = warehouse.reception_steps
+
+        try:
+            # Configure warehouse for 2-step receipt (Input + Stock)
+            warehouse.reception_steps = "two_steps"
+
+            # For receipts, we create the IN picking directly (like a PO would)
+            # The push rule will create the internal transfer
+
+            # First, let's find or create the input location
+            input_location = warehouse.wh_input_stock_loc_id
+
+            # Create the receipt picking (Supplier -> Input)
+            receipt_picking = self.env["stock.picking"].create(
+                {
+                    "picking_type_id": warehouse.in_type_id.id,
+                    "location_id": supplier_location.id,
+                    "location_dest_id": input_location.id,
+                }
+            )
+            receipt_move = self.env["stock.move"].create(
+                {
+                    "name": self.product.name,
+                    "picking_id": receipt_picking.id,
+                    "product_id": self.product.id,
+                    "product_uom_qty": 10.0,
+                    "product_uom": self.product.uom_id.id,
+                    "location_id": supplier_location.id,
+                    "location_dest_id": input_location.id,
+                }
+            )
+
+            # Confirm the receipt - this triggers push rules to create internal transfer
+            receipt_picking.action_confirm()
+
+            # Find the internal transfer that was created by push rule
+            internal_picking = self.env["stock.picking"].search(
+                [
+                    ("picking_type_id", "=", warehouse.int_type_id.id),
+                    ("location_id", "=", input_location.id),
+                    ("location_dest_id", "=", warehouse.lot_stock_id.id),
+                    ("state", "!=", "cancel"),
+                ],
+                order="id desc",
+                limit=1,
+            )
+
+            # If push rule created internal transfer, test the chain
+            if internal_picking:
+                internal_move = internal_picking.move_ids.filtered(lambda m: m.product_id == self.product)
+
+                if internal_move:
+                    # Verify chain was created
+                    self.assertIn(internal_move, receipt_move.move_dest_ids)
+                    self.assertIn(receipt_move, internal_move.move_orig_ids)
+
+                    # Cancel the receipt and set to draft
+                    receipt_picking.action_cancel_back_to_draft()
+
+                    # Verify states
+                    self.assertEqual(receipt_picking.state, "draft")
+
+                    # Verify chain is preserved
+                    self.assertIn(
+                        internal_move, receipt_move.move_dest_ids, "Chain link should be preserved after cancel"
+                    )
+
+        finally:
+            # Restore original warehouse setting
+            warehouse.reception_steps = original_reception_steps
+
+    def test_manual_two_step_chain_preserved(self):
+        """Test manually created 2-step chain (fallback test without procurement).
+
+        This test doesn't rely on warehouse configuration, useful for simpler setups.
+        """
+        warehouse = self.env["stock.warehouse"].search([], limit=1)
+        stock_location = warehouse.lot_stock_id
+
+        # Create or find output location
+        output_location = warehouse.wh_output_stock_loc_id
+        if not output_location or not output_location.active:
+            output_location = self.env["stock.location"].create(
+                {
+                    "name": "Test Output",
+                    "usage": "internal",
+                    "location_id": warehouse.view_location_id.id,
+                }
+            )
+
+        # Create Pick: Stock -> Output
+        pick = self.env["stock.picking"].create(
+            {
+                "picking_type_id": warehouse.pick_type_id.id or warehouse.int_type_id.id,
+                "location_id": stock_location.id,
+                "location_dest_id": output_location.id,
+            }
+        )
+        pick_move = self.env["stock.move"].create(
+            {
+                "name": self.product.name,
+                "picking_id": pick.id,
+                "product_id": self.product.id,
+                "product_uom_qty": 5.0,
+                "product_uom": self.product.uom_id.id,
+                "location_id": stock_location.id,
+                "location_dest_id": output_location.id,
+                "propagate_cancel": True,
+            }
+        )
+
+        # Create Ship: Output -> Customer
+        ship = self.env["stock.picking"].create(
+            {
+                "picking_type_id": self.env.ref("stock.picking_type_out").id,
+                "location_id": output_location.id,
+                "location_dest_id": self.cust_location.id,
+            }
+        )
+        ship_move = self.env["stock.move"].create(
+            {
+                "name": self.product.name,
+                "picking_id": ship.id,
+                "product_id": self.product.id,
+                "product_uom_qty": 5.0,
+                "product_uom": self.product.uom_id.id,
+                "location_id": output_location.id,
+                "location_dest_id": self.cust_location.id,
+                "procure_method": "make_to_order",
+            }
+        )
+
+        # Link the moves: Pick -> Ship
+        pick_move.move_dest_ids = [(4, ship_move.id)]
+
+        # Confirm both pickings
+        pick.action_confirm()
+        ship.action_confirm()
+
+        # Verify chain is set up
+        self.assertEqual(pick_move.move_dest_ids, ship_move)
+        self.assertEqual(ship_move.move_orig_ids, pick_move)
+
+        # Cancel and set to draft
+        pick.action_cancel_back_to_draft()
+
+        # Verify both are draft
+        self.assertEqual(pick.state, "draft")
+        self.assertEqual(ship.state, "draft")
+
+        # CRITICAL: Verify chain links preserved
+        self.assertEqual(pick_move.move_dest_ids, ship_move)
+        self.assertEqual(ship_move.move_orig_ids, pick_move)
+        self.assertEqual(ship_move.procure_method, "make_to_order")

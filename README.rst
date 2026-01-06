@@ -55,7 +55,7 @@ To run the module tests in a Docker container:
 .. code-block:: bash
 
     # Using docker exec (on a running container)
-    docker exec -it f5ca90253c0dcbfb47132ca561de1fc218b7520eb6fc0bbb75962174840d0981 odoo \
+    docker exec -it 562803c922f2a3fb6652d0b1acce07c536dc60d18e308aba86192d791bb571c6 odoo \
   --addons-path=/opt/odoo/odoo/addons,/mnt/extra-addons \
   --test-enable --stop-after-init \
   -d odoo \

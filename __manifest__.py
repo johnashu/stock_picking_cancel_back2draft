@@ -2,8 +2,8 @@
 # Original code: https://github.com/OCA/stock-logistics-workflow
 {
     "name": "Pickings cancel and back to draft",
-    "summary": "Cancel pickings and reopen cancelled pickings",
-    "version": "17.0.0.0.0",
+    "summary": "Cancel pickings, reopen cancelled pickings, and change warehouse",
+    "version": "17.0.1.0.0",
     "category": "Warehouse Management",
     "author": "John Ashurst",
     "license": "AGPL-3",
@@ -14,6 +14,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "views/picking_view.xml",
+        "views/stock_picking_change_warehouse_views.xml",
     ],
     "images": ["images/picking.png"],
 }
