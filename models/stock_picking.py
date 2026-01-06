@@ -21,6 +21,7 @@ class StockPicking(models.Model):
             )
 
         return {
+            "name": _("Change Warehouse"),
             "type": "ir.actions.act_window",
             "res_model": "stock.picking.change.warehouse",
             "view_mode": "form",

@@ -1,14 +1,17 @@
 {
     "name": "Stock Picking Cancel, Draft & Change Warehouse",
     "summary": "Cancel pickings, reset to draft, and change warehouse with chain preservation",
-    "version": "17.0.2.1.5",
+    "version": "17.0.2.1.6",
     "category": "Warehouse Management",
     "author": "SJR Nebula - John Ashurst",
     "website": "https://sjr.ie",
     "license": "AGPL-3",
     "application": False,
     "installable": True,
-    "depends": ["stock", "sale_stock"],
+    "depends": [
+        "stock",
+        "sale_stock",  # Used for testing only.
+    ],
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
