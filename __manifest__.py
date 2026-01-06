@@ -3,7 +3,7 @@
 {
     "name": "Pickings cancel and back to draft",
     "summary": "Cancel pickings, reopen cancelled pickings, and change warehouse",
-    "version": "17.0.2.0.2",
+    "version": "17.0.2.0.3",
     "category": "Warehouse Management",
     "author": "John Ashurst",
     "license": "AGPL-3",

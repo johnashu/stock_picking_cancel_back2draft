@@ -26,6 +26,8 @@ class StockMove(models.Model):
 
         moves_to_cancel = self.filtered(lambda m: m.state != "cancel" and not (m.state == "done" and m.scrapped))
         moves_to_cancel.picked = False
+        # Also clear picked on move lines so _do_unreserve can unlink them
+        moves_to_cancel.move_line_ids.picked = False
         moves_to_cancel._do_unreserve()
 
         moves_to_cancel.state = "cancel"
