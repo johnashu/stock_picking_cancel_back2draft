@@ -9,7 +9,7 @@
             <xpath expr="//button[@name='action_cancel']" position="after">
                 <button
                     name="action_open_change_warehouse_wizard"
-                    invisible="state == 'done'"
+                    invisible="state in ('done', 'cancel')"
                     string="Change Warehouse"
                     groups="stock_picking_cancel_back2draft.group_stock_picking_cancel_back2draft"
                     type="object"

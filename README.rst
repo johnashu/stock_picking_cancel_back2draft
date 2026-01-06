@@ -11,7 +11,17 @@ Original code: https://github.com/OCA/stock-logistics-workflow
 
 |badge1|
 
-This module allows to cancel pickings and bring cancelled pickings back to draft.
+This module allows you to change the warehouse on pickings with a single click.
+The "Change Warehouse" action will automatically:
+
+1. Cancel the picking (if not already cancelled)
+2. Reset it to draft state
+3. Update the warehouse, operation type, and locations
+4. Confirm the picking as "To Do"
+
+This is especially useful for 2-step or 3-step delivery/receipt workflows where
+you need to reassign pickings to a different warehouse while preserving the
+chain links between Pick and Out operations.
 
 **Table of contents**
 
@@ -28,7 +38,7 @@ Installation
 Configuration
 =============
 
-To allow users to cancel and bring pickings back to draft, you must add them to the
+To allow users to change warehouse on pickings, you must add them to the
 "Cancel & Back to Draft Pickings" security group:
 
 1. Go to Settings > Users & Companies > Users.
@@ -40,12 +50,33 @@ Only users in this group will see the button and be able to use this feature.
 Usage
 =====
 
-To cancel and bring a picking back to draft:
+To change the warehouse on a picking:
 
-- In a pick form view, click on the 'Cancel & Back to Draft' button.
-- In a pick list view, select the pickings and choose the 'Cancel & Back to Draft' action from the action menu.
+1. Open a picking form view (any state except "Done")
+2. Click the **"Change Warehouse"** button
+3. In the wizard:
+   - Select the new warehouse
+   - Choose whether to include chained pickings (Pick/Out chain)
+   - Review the pickings that will be updated
+4. Click **"Change Warehouse"** to execute
 
-**Note:** This action cannot be performed on pickings in the "done" state.
+The system will automatically:
+
+- Cancel the pickings (preserving chain links)
+- Reset them to draft
+- Update warehouse, operation type, and locations
+- Confirm them as "To Do"
+
+**Note:** This action cannot be performed on pickings in the "Done" state.
+
+Features
+========
+
+- **Single-click operation**: No need to manually cancel and reset pickings first
+- **Chain preservation**: Pick <-> Out chain links are maintained
+- **Automatic confirmation**: Pickings are marked as "To Do" after the change
+- **Chained picking support**: Optionally update all linked pickings in the chain
+- **Multi-step delivery support**: Works with 2-step (Pick + Ship) and 3-step workflows
 
 Running Tests
 =============
@@ -55,15 +86,12 @@ To run the module tests in a Docker container:
 .. code-block:: bash
 
     # Using docker exec (on a running container)
-    docker exec -it 562803c922f2a3fb6652d0b1acce07c536dc60d18e308aba86192d791bb571c6 odoo \
-  --addons-path=/opt/odoo/odoo/addons,/mnt/extra-addons \
-  --test-enable --stop-after-init \
-  -d odoo \
-  -i stock_picking_cancel_back2draft \
-  --log-level=test \
-  --db_host=odoo-db-demo \
-  --db_user=odoo \
-  --db_password=odoo_demo_password
+    docker exec -it <container_id> odoo \
+      --addons-path=/opt/odoo/odoo/addons,/mnt/extra-addons \
+      --test-enable --stop-after-init \
+      -d odoo \
+      -i stock_picking_cancel_back2draft \
+      --log-level=test
 
     # Using docker compose run (creates a new container)
     docker compose run --rm odoo odoo --test-enable --stop-after-init \
@@ -71,7 +99,7 @@ To run the module tests in a Docker container:
       -u stock_picking_cancel_back2draft \
       --log-level=test
 
-Replace ``<container_name>`` with your Odoo container name and ``<database_name>`` with your database name.
+Replace ``<container_id>`` with your Odoo container ID and adjust database settings as needed.
 
 Test flags:
 

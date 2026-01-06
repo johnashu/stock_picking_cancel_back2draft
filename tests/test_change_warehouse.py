@@ -82,24 +82,24 @@ class TestChangeWarehouse(TransactionCase):
         return pick_picking, ship_picking
 
     def test_change_warehouse_wizard_creation(self):
-        """Test that the change warehouse wizard opens correctly."""
+        """Test that the change warehouse wizard opens correctly on confirmed picking."""
         pick, ship = self._create_two_step_delivery(self.warehouse1)
 
-        # Cancel and reset to draft
-        pick.action_cancel_back_to_draft()
+        # Verify picking is confirmed (wizard should work on any non-done state)
+        self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
 
-        # Open wizard
+        # Open wizard - should work on confirmed pickings now
         action = pick.action_open_change_warehouse_wizard()
         self.assertEqual(action["res_model"], "stock.picking.change.warehouse")
 
-    def test_change_warehouse_on_draft_picking(self):
-        """Test changing warehouse on a draft picking."""
+    def test_change_warehouse_full_flow(self):
+        """Test changing warehouse performs full flow: cancel -> draft -> change -> confirm."""
         pick, ship = self._create_two_step_delivery(self.warehouse1)
 
-        # Cancel and reset to draft
-        pick.action_cancel_back_to_draft()
+        # Verify pickings start in confirmed state
+        self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
 
-        # Create wizard
+        # Create wizard on confirmed picking (no need to cancel first anymore)
         wizard = self.env["stock.picking.change.warehouse"].with_context(
             active_ids=[pick.id],
             active_model="stock.picking",
@@ -112,7 +112,7 @@ class TestChangeWarehouse(TransactionCase):
         self.assertIn(pick, wizard.chained_picking_ids)
         self.assertIn(ship, wizard.chained_picking_ids)
 
-        # Execute warehouse change
+        # Execute warehouse change - this will cancel, reset to draft, change, and confirm
         wizard.action_change_warehouse()
 
         # Verify pick was updated
@@ -136,6 +136,10 @@ class TestChangeWarehouse(TransactionCase):
         self.assertEqual(pick_move.move_dest_ids, ship_move)
         self.assertEqual(ship_move.move_orig_ids, pick_move)
 
+        # Verify pickings are confirmed (marked as "To Do")
+        self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
+        self.assertIn(ship.state, ("confirmed", "waiting"))
+
     def test_change_warehouse_preserves_so_link(self):
         """Test that changing warehouse preserves the sale_line_id link."""
         # Skip if sale_stock not installed
@@ -149,10 +153,7 @@ class TestChangeWarehouse(TransactionCase):
         pick.move_ids.write({"sale_line_id": fake_sale_line_id})
         ship.move_ids.write({"sale_line_id": fake_sale_line_id})
 
-        # Cancel and reset
-        pick.action_cancel_back_to_draft()
-
-        # Change warehouse
+        # Change warehouse (will auto-cancel and reset)
         wizard = self.env["stock.picking.change.warehouse"].with_context(
             active_ids=[pick.id],
             active_model="stock.picking",
@@ -172,10 +173,7 @@ class TestChangeWarehouse(TransactionCase):
 
         original_group = pick.group_id
 
-        # Cancel and reset
-        pick.action_cancel_back_to_draft()
-
-        # Change warehouse
+        # Change warehouse (will auto-cancel and reset)
         wizard = self.env["stock.picking.change.warehouse"].with_context(
             active_ids=[pick.id],
             active_model="stock.picking",
@@ -218,10 +216,7 @@ class TestChangeWarehouse(TransactionCase):
         """Test changing warehouse without including chained pickings."""
         pick, ship = self._create_two_step_delivery(self.warehouse1)
 
-        # Cancel and reset to draft
-        pick.action_cancel_back_to_draft()
-
-        # Create wizard without chained pickings
+        # Create wizard without chained pickings (on confirmed picking)
         wizard = self.env["stock.picking.change.warehouse"].with_context(
             active_ids=[pick.id],
             active_model="stock.picking",
@@ -230,34 +225,25 @@ class TestChangeWarehouse(TransactionCase):
             "include_chained_pickings": False,
         })
 
-        # Verify only pick is included (not ship, though it will likely be in chained)
+        # Verify only pick is included (not ship)
         self.assertEqual(wizard.picking_count, 1)
 
-    def test_pickings_confirmed_after_warehouse_change(self):
-        """Test that pickings are automatically confirmed after warehouse change."""
+    def test_change_warehouse_fails_on_done_picking(self):
+        """Test that changing warehouse fails on done pickings."""
         pick, ship = self._create_two_step_delivery(self.warehouse1)
 
-        # Cancel and reset
-        pick.action_cancel_back_to_draft()
+        # Add stock and complete the pick
+        self.env["stock.quant"]._update_available_quantity(
+            self.product, self.warehouse1.lot_stock_id, 10
+        )
+        pick.action_assign()
+        for move in pick.move_ids:
+            move.quantity = move.product_uom_qty
+        pick.button_validate()
 
-        # Change warehouse
-        wizard = self.env["stock.picking.change.warehouse"].with_context(
-            active_ids=[pick.id],
-            active_model="stock.picking",
-        ).create({
-            "new_warehouse_id": self.warehouse2.id,
-            "include_chained_pickings": True,
-        })
-        wizard.action_change_warehouse()
+        self.assertEqual(pick.state, "done")
 
-        # Verify pickings are automatically confirmed (marked as "To Do")
-        self.assertIn(pick.state, ("confirmed", "assigned", "waiting"))
-        self.assertIn(ship.state, ("confirmed", "waiting"))
-
-        # Verify chain still works
-        pick_move = pick.move_ids
-        ship_move = ship.move_ids
-        self.assertEqual(pick_move.move_dest_ids, ship_move)
-        self.assertEqual(ship_move.move_orig_ids, pick_move)
-        self.assertEqual(ship_move.procure_method, "make_to_order")
+        # Try to open wizard on done picking - should fail
+        with self.assertRaises(UserError):
+            pick.action_open_change_warehouse_wizard()
 
