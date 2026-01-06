@@ -1,9 +1,6 @@
-=================================
-Pickings cancel and back to draft
-=================================
-
-Modified from Stock back 2 draft by OCA.
-Original code: https://github.com/OCA/stock-logistics-workflow
+==========================================
+Stock Picking Cancel, Draft & Change Warehouse
+==========================================
 
 .. |badge1| image:: https://img.shields.io/badge/licence-AGPL--3-blue.png
     :target: http://www.gnu.org/licenses/agpl-3.0-standalone.html
@@ -33,7 +30,7 @@ Installation
 
 1. Copy the ``stock_picking_cancel_back2draft`` folder to your Odoo addons directory.
 2. Update the apps list in Odoo (Settings > Apps > Update Apps List).
-3. Search for "Pickings cancel and back to draft" and install it.
+3. Search for "Stock Picking Cancel, Draft & Change Warehouse" and install it.
 
 Configuration
 =============
@@ -74,9 +71,11 @@ Features
 
 - **Single-click operation**: No need to manually cancel and reset pickings first
 - **Chain preservation**: Pick <-> Out chain links are maintained
+- **Serial number flow**: Serial numbers flow correctly through the chain after warehouse change
 - **Automatic confirmation**: Pickings are marked as "To Do" after the change
 - **Chained picking support**: Optionally update all linked pickings in the chain
 - **Multi-step delivery support**: Works with 2-step (Pick + Ship) and 3-step workflows
+- **Multi-step receipt support**: Works with 2-step (Receipt + Internal) workflows
 
 Running Tests
 =============
@@ -87,11 +86,11 @@ To run the module tests in a Docker container:
 
     # Using docker exec (on a running container)
     docker exec -it <container_id> odoo \
-      --addons-path=/opt/odoo/odoo/addons,/mnt/extra-addons \
-      --test-enable --stop-after-init \
+      --test-enable \
+      --stop-after-init \
       -d odoo \
-      -i stock_picking_cancel_back2draft \
-      --log-level=test
+      -u stock_picking_cancel_back2draft \
+      --test-tags /stock_picking_cancel_back2draft
 
     # Using docker compose run (creates a new container)
     docker compose run --rm odoo odoo --test-enable --stop-after-init \
@@ -129,17 +128,3 @@ Contributors
 ------------
 
 * John Ashurst
-
-Original Authors
-----------------
-
-* Agile Business Group
-
-Original Contributors
----------------------
-
--  Lorenzo Battistini <lorenzo.battistini@agilebg.com>
--  Iván Montagud <ivan@studio73.es>
--  Pimolnat Suntian <pimolnats@ecosoft.co.th>
--  David Montull Guasch <david.montull@bt-group.com>
--  Marwan Behillil <marwan@riluxa.com>

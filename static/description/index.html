@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pickings cancel and back to draft</title>
+    <title>Stock Picking Cancel, Draft & Change Warehouse</title>
     <style type="text/css">
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -95,15 +95,7 @@
   </head>
   <body>
     <div class="document">
-      <h1>Pickings cancel and back to draft</h1>
-
-      <p>
-        Modified from Stock back 2 draft by OCA.<br />
-        Original code:
-        <a href="https://github.com/OCA/stock-logistics-workflow"
-          >https://github.com/OCA/stock-logistics-workflow</a
-        >
-      </p>
+      <h1>Stock Picking Cancel, Draft & Change Warehouse</h1>
 
       <p class="badge">
         <a href="http://www.gnu.org/licenses/agpl-3.0-standalone.html">
@@ -131,7 +123,8 @@
         <strong>Key Benefit:</strong> This is especially useful for 2-step or
         3-step delivery/receipt workflows where you need to reassign pickings to
         a different warehouse while preserving the chain links between Pick and
-        Out operations.
+        Out operations. Serial numbers flow correctly through the chain after
+        warehouse change.
       </div>
 
       <div class="section" id="features">
@@ -146,6 +139,10 @@
             maintained
           </li>
           <li>
+            <strong>Serial number flow:</strong> Serial numbers flow correctly
+            through the chain after warehouse change
+          </li>
+          <li>
             <strong>Automatic confirmation:</strong> Pickings are marked as "To
             Do" after the change
           </li>
@@ -156,6 +153,10 @@
           <li>
             <strong>Multi-step delivery support:</strong> Works with 2-step
             (Pick + Ship) and 3-step workflows
+          </li>
+          <li>
+            <strong>Multi-step receipt support:</strong> Works with 2-step
+            (Receipt + Internal) workflows
           </li>
         </ul>
       </div>
@@ -172,7 +173,8 @@
             List).
           </li>
           <li>
-            Search for "Pickings cancel and back to draft" and install it.
+            Search for "Stock Picking Cancel, Draft & Change Warehouse" and
+            install it.
           </li>
         </ol>
       </div>
@@ -213,7 +215,9 @@
             <span class="step-number">3</span>In the wizard:
             <ul>
               <li>Select the new warehouse</li>
-              <li>Choose whether to include chained pickings (Pick/Out chain)</li>
+              <li>
+                Choose whether to include chained pickings (Pick/Out chain)
+              </li>
               <li>Review the pickings that will be updated</li>
             </ul>
           </li>
@@ -257,20 +261,6 @@
         <h3>Contributors</h3>
         <ul>
           <li>John Ashurst</li>
-        </ul>
-
-        <h3>Original Authors</h3>
-        <ul>
-          <li>Agile Business Group</li>
-        </ul>
-
-        <h3>Original Contributors</h3>
-        <ul>
-          <li>Lorenzo Battistini &lt;lorenzo.battistini@agilebg.com&gt;</li>
-          <li>Iván Montagud &lt;ivan@studio73.es&gt;</li>
-          <li>Pimolnat Suntian &lt;pimolnats@ecosoft.co.th&gt;</li>
-          <li>David Montull Guasch &lt;david.montull@bt-group.com&gt;</li>
-          <li>Marwan Behillil &lt;marwan@riluxa.com&gt;</li>
         </ul>
       </div>
     </div>
