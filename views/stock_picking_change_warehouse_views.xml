@@ -30,10 +30,11 @@
                         </tree>
                     </field>
                 </group>
+                <div class="alert alert-warning" role="alert" invisible="not done_picking_count">
+                    <strong>Note:</strong> These pickings are in 'done' state and cannot be changed.
+                    They will be skipped, but links to them will be maintained. </div>
                 <group string="Done Pickings (Will Be Skipped)" invisible="not done_picking_count">
-                    <div class="alert alert-warning" role="alert" invisible="not done_picking_count">
-                        <strong>Note:</strong> These pickings are in 'done' state and cannot be
-                        changed. They will be skipped, but links to them will be maintained. </div>
+
                     <field name="done_picking_ids" nolabel="1" colspan="2">
                         <tree>
                             <field name="name" />
