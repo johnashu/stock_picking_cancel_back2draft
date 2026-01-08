@@ -1,0 +1,192 @@
+name: Test Odoo 17 - Stock Picking Cancel Back2Draft
+
+on:
+  push:
+    branches: [main, develop, master]
+  pull_request:
+    branches: [main, develop, master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo_test_password
+          POSTGRES_DB: odoo_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc \
+            g++ \
+            libc6-dev \
+            libssl-dev \
+            libldap2-dev \
+            libsasl2-dev \
+            libpq-dev \
+            python3-dev \
+            ca-certificates \
+            curl \
+            dirmngr \
+            fonts-noto-cjk \
+            gnupg \
+            node-less \
+            npm \
+            python3-magic \
+            python3-num2words \
+            python3-pdfminer \
+            python3-phonenumbers \
+            python3-qrcode \
+            python3-renderpm \
+            python3-setuptools \
+            python3-slugify \
+            python3-vobject \
+            python3-watchdog \
+            python3-xlrd \
+            python3-xlwt \
+            xz-utils \
+            netcat-openbsd \
+            postgresql-client
+
+      - name: Install Odoo 17.0
+        run: |
+          python -m pip install --upgrade pip
+          pip install odoo==17.0
+
+      - name: Get Odoo addons path
+        id: odoo_path
+        run: |
+          ODOO_ADDONS=$(python -c "import odoo; import os; print(os.path.dirname(odoo.__file__) + '/addons')")
+          echo "addons_path=$ODOO_ADDONS,${{ github.workspace }}" >> $GITHUB_OUTPUT
+
+      - name: Create Odoo configuration
+        run: |
+          mkdir -p test_config
+          cat > test_config/odoo.conf << EOF
+          [options]
+          addons_path = ${{ steps.odoo_path.outputs.addons_path }}
+          data_dir = /tmp/odoo_data
+
+          # Database Configuration
+          db_host = localhost
+          db_port = 5432
+          db_user = odoo
+          db_password = odoo_test_password
+          db_name = odoo_test
+          dbfilter = odoo_test
+
+          # Logging
+          log_level = test
+          log_handler = :INFO
+          log_db = False
+
+          # Performance
+          workers = 0
+          max_cron_threads = 0
+          EOF
+
+      - name: Initialize database
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: odoo
+          PGPASSWORD: odoo_test_password
+          PGDATABASE: odoo_test
+        run: |
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h localhost -p 5432 -U odoo; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+          # Initialize database with base modules
+          odoo \
+            --addons-path="${{ steps.odoo_path.outputs.addons_path }}" \
+            --config=test_config/odoo.conf \
+            --database=odoo_test \
+            --db-host=localhost \
+            --db-port=5432 \
+            --db-user=odoo \
+            --db-password=odoo_test_password \
+            --init=base \
+            --stop-after-init \
+            --without-demo=all \
+            --log-level=warn
+
+      - name: Install module dependencies
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: odoo
+          PGPASSWORD: odoo_test_password
+          PGDATABASE: odoo_test
+        run: |
+          odoo \
+            --addons-path="${{ steps.odoo_path.outputs.addons_path }}" \
+            --config=test_config/odoo.conf \
+            --database=odoo_test \
+            --db-host=localhost \
+            --db-port=5432 \
+            --db-user=odoo \
+            --db-password=odoo_test_password \
+            --init=stock,sale_stock \
+            --stop-after-init \
+            --without-demo=all \
+            --log-level=warn
+
+      - name: Install test module and run tests
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: odoo
+          PGPASSWORD: odoo_test_password
+          PGDATABASE: odoo_test
+        run: |
+          odoo \
+            --addons-path="${{ steps.odoo_path.outputs.addons_path }}" \
+            --config=test_config/odoo.conf \
+            --database=odoo_test \
+            --db-host=localhost \
+            --db-port=5432 \
+            --db-user=odoo \
+            --db-password=odoo_test_password \
+            --init=stock_picking_cancel_back2draft \
+            --test-enable \
+            --test-tags=/stock_picking_cancel_back2draft:TestChangeWarehouse \
+            --stop-after-init \
+            --without-demo=all \
+            --log-level=test
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            *.log
+            /tmp/odoo_data/*.log
+          if-no-files-found: ignore

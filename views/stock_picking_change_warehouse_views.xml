@@ -10,15 +10,32 @@
                 <group>
                     <group>
                         <field name="current_warehouse_id" />
-                        <field name="new_warehouse_id" options="{'no_create': True, 'no_edit': True}" />
+                        <field name="new_warehouse_id"
+                            options="{'no_create': True, 'no_edit': True}" />
                     </group>
                     <group>
                         <field name="include_chained_pickings" />
                         <field name="picking_count" />
+                        <field name="done_picking_count" />
                     </group>
                 </group>
-                <group string="Pickings to Update">
+                <group string="Pickings to Update" invisible="not picking_count">
                     <field name="chained_picking_ids" nolabel="1" colspan="2">
+                        <tree>
+                            <field name="name" />
+                            <field name="picking_type_id" />
+                            <field name="location_id" />
+                            <field name="location_dest_id" />
+                            <field name="state" />
+                        </tree>
+                    </field>
+                </group>
+                <div class="alert alert-warning" role="alert" invisible="not done_picking_count">
+                    <strong>Note:</strong> These pickings are in 'done' state and cannot be changed.
+                    They will be skipped, but links to them will be maintained. </div>
+                <group string="Done Pickings (Will Be Skipped)" invisible="not done_picking_count">
+
+                    <field name="done_picking_ids" nolabel="1" colspan="2">
                         <tree>
                             <field name="name" />
                             <field name="picking_type_id" />
@@ -30,15 +47,15 @@
                 </group>
                 <separator />
                 <div class="alert alert-info" role="alert">
-                    <strong>Note:</strong> This will cancel the pickings, reset them to draft, 
+                    <strong>Note:</strong> This will cancel non-done pickings, reset them to draft,
                     update the warehouse/operation type/locations, and then confirm them as "To Do".
-                    The chain links between Pick and Out operations will be preserved.
-                </div>
+                    Done pickings will be skipped but links to them will be maintained. The chain
+                    links between Pick and Out operations will be preserved. </div>
                 <footer>
                     <button name="action_change_warehouse"
-                            string="Change Warehouse"
-                            type="object"
-                            class="btn-primary" />
+                        string="Change Warehouse"
+                        type="object"
+                        class="btn-primary" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
@@ -53,6 +70,7 @@
         <field name="target">new</field>
         <field name="binding_model_id" ref="stock.model_stock_picking" />
         <field name="binding_view_types">list,form</field>
-        <field name="groups_id" eval="[Command.link(ref('stock_picking_cancel_back2draft.group_stock_picking_cancel_back2draft'))]"/>
+        <field name="groups_id"
+            eval="[(4, ref('stock_picking_cancel_back2draft.group_stock_picking_cancel_back2draft'))]" />
     </record>
 </odoo>
