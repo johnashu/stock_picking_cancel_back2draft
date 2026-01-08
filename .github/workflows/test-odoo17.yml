@@ -72,16 +72,24 @@ jobs:
             netcat-openbsd \
             postgresql-client
 
-      - name: Install Odoo 17.0
+      - name: Clone Odoo 17.0
+        run: |
+          git clone --depth 1 --branch 17.0 https://github.com/odoo/odoo.git odoo-17.0
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install odoo==17.0
+          pip install -r odoo-17.0/requirements.txt
+
+      - name: Install Odoo
+        working-directory: odoo-17.0
+        run: |
+          pip install -e .
 
       - name: Get Odoo addons path
         id: odoo_path
         run: |
-          ODOO_ADDONS=$(python -c "import odoo; import os; print(os.path.dirname(odoo.__file__) + '/addons')")
-          echo "addons_path=$ODOO_ADDONS,${{ github.workspace }}" >> $GITHUB_OUTPUT
+          echo "addons_path=${{ github.workspace }}/odoo-17.0/addons,${{ github.workspace }}" >> $GITHUB_OUTPUT
 
       - name: Create Odoo configuration
         run: |
@@ -124,7 +132,7 @@ jobs:
           done
 
           # Initialize database with base modules
-          odoo \
+          python odoo-17.0/odoo-bin \
             --addons-path="${{ steps.odoo_path.outputs.addons_path }}" \
             --config=test_config/odoo.conf \
             --database=odoo_test \
@@ -145,7 +153,7 @@ jobs:
           PGPASSWORD: odoo_test_password
           PGDATABASE: odoo_test
         run: |
-          odoo \
+          python odoo-17.0/odoo-bin \
             --addons-path="${{ steps.odoo_path.outputs.addons_path }}" \
             --config=test_config/odoo.conf \
             --database=odoo_test \
@@ -166,7 +174,7 @@ jobs:
           PGPASSWORD: odoo_test_password
           PGDATABASE: odoo_test
         run: |
-          odoo \
+          python odoo-17.0/odoo-bin \
             --addons-path="${{ steps.odoo_path.outputs.addons_path }}" \
             --config=test_config/odoo.conf \
             --database=odoo_test \
