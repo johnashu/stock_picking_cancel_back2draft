@@ -45,6 +45,18 @@ class StockPickingChangeWarehouse(models.TransientModel):
         string="Pickings to Update",
         compute="_compute_chained_pickings",
     )
+    done_picking_ids = fields.Many2many(
+        "stock.picking",
+        "stock_picking_change_wh_done_rel",
+        string="Done Pickings (Skipped)",
+        compute="_compute_chained_pickings",
+        readonly=True,
+        help="Pickings in 'done' state that will be skipped (cannot be changed)",
+    )
+    done_picking_count = fields.Integer(
+        string="Done Pickings (Skipped)",
+        compute="_compute_chained_pickings",
+    )
 
     @api.model
     def default_get(self, fields_list):
@@ -70,8 +82,16 @@ class StockPickingChangeWarehouse(models.TransientModel):
                 all_pickings = wizard._get_all_chained_pickings(wizard.picking_ids)
             else:
                 all_pickings = wizard.picking_ids
-            wizard.chained_picking_ids = all_pickings
-            wizard.picking_count = len(all_pickings)
+
+            # Separate done pickings from those that can be updated
+            done_pickings = all_pickings.filtered(lambda p: p.state == "done")
+            updatable_pickings = all_pickings - done_pickings
+
+            # chained_picking_ids should only contain updatable pickings
+            wizard.chained_picking_ids = updatable_pickings
+            wizard.picking_count = len(updatable_pickings)
+            wizard.done_picking_ids = done_pickings
+            wizard.done_picking_count = len(done_pickings)
 
     def _get_all_chained_pickings(self, pickings):
         """Get all pickings in the chain (both upstream and downstream)."""
@@ -106,7 +126,7 @@ class StockPickingChangeWarehouse(models.TransientModel):
 
     def action_change_warehouse(self):
         """Change warehouse for selected pickings and optionally chained pickings.
-        
+
         This will:
         1. Cancel pickings (if not already cancelled)
         2. Set pickings back to draft
@@ -123,46 +143,68 @@ class StockPickingChangeWarehouse(models.TransientModel):
 
         pickings = self.chained_picking_ids if self.include_chained_pickings else self.picking_ids
 
-        # Check for done pickings - these cannot be changed
+        # Filter out done pickings - these cannot be changed but we'll skip them
         done_pickings = pickings.filtered(lambda p: p.state == "done")
-        if done_pickings:
+        updatable_pickings = pickings - done_pickings
+
+        if not updatable_pickings:
             raise UserError(
-                _(
-                    "Cannot change warehouse for completed pickings: %s"
-                )
+                _("No pickings can be updated. All selected pickings are in 'done' state: %s")
                 % ", ".join(done_pickings.mapped("name"))
             )
 
+        # Show warning if done pickings are present but allow operation to proceed
+        warning_message = None
+        if done_pickings:
+            warning_message = _(
+                "Note: The following completed pickings will be skipped (cannot be changed): %s\n\n"
+                "Only non-done pickings (backorders, draft, etc.) will be updated."
+            ) % ", ".join(done_pickings.mapped("name"))
+
         # Cancel and set to draft any pickings that are not already in draft/cancel state
-        pickings_to_reset = pickings.filtered(lambda p: p.state not in ("draft", "cancel"))
+        pickings_to_reset = updatable_pickings.filtered(lambda p: p.state not in ("draft", "cancel"))
         if pickings_to_reset:
             pickings_to_reset.action_cancel_back_to_draft()
 
-        # Change warehouse for each picking
-        for picking in pickings:
+        # Change warehouse for each updatable picking only
+        for picking in updatable_pickings:
             self._update_picking_warehouse(picking, self.new_warehouse_id)
 
         # Confirm pickings to mark them as "To Do"
         # This moves them from draft to confirmed/waiting state
-        pickings.action_confirm()
+        updatable_pickings.action_confirm()
+
+        # Prepare return action
+        action_name = _("Updated Pickings")
+        if done_pickings:
+            action_name = _("Updated Pickings ({} done pickings skipped)").format(len(done_pickings))
 
         # Return action to show updated pickings
-        if len(pickings) == 1:
-            return {
-                "type": "ir.actions.act_window",
-                "res_model": "stock.picking",
-                "view_mode": "form",
-                "res_id": pickings.id,
-                "target": "current",
-            }
-        return {
+        result = {
             "type": "ir.actions.act_window",
             "res_model": "stock.picking",
             "view_mode": "list,form",
-            "domain": [("id", "in", pickings.ids)],
+            "domain": [("id", "in", updatable_pickings.ids)],
             "target": "current",
-            "name": _("Updated Pickings"),
+            "name": action_name,
         }
+
+        # Show warning if done pickings were skipped
+        if warning_message:
+            result["warning"] = (
+                _("Some Pickings Skipped"),
+                warning_message,
+            )
+
+        if len(updatable_pickings) == 1:
+            result.update(
+                {
+                    "view_mode": "form",
+                    "res_id": updatable_pickings.id,
+                }
+            )
+
+        return result
 
     def _update_picking_warehouse(self, picking, new_warehouse):
         """Update a picking's warehouse, locations, and operation type."""
@@ -184,11 +226,13 @@ class StockPickingChangeWarehouse(models.TransientModel):
         new_location_dest_id = self._get_new_dest_location(picking, new_picking_type, new_warehouse)
 
         # Update picking
-        picking.write({
-            "picking_type_id": new_picking_type.id,
-            "location_id": new_location_id.id,
-            "location_dest_id": new_location_dest_id.id,
-        })
+        picking.write(
+            {
+                "picking_type_id": new_picking_type.id,
+                "location_id": new_location_id.id,
+                "location_dest_id": new_location_dest_id.id,
+            }
+        )
 
         # Update moves
         for move in picking.move_ids:
@@ -209,19 +253,25 @@ class StockPickingChangeWarehouse(models.TransientModel):
         sequence_code = old_picking_type.sequence_code
 
         # First try exact match by sequence code
-        new_picking_type = self.env["stock.picking.type"].search([
-            ("warehouse_id", "=", new_warehouse.id),
-            ("sequence_code", "=", sequence_code),
-        ], limit=1)
+        new_picking_type = self.env["stock.picking.type"].search(
+            [
+                ("warehouse_id", "=", new_warehouse.id),
+                ("sequence_code", "=", sequence_code),
+            ],
+            limit=1,
+        )
 
         if new_picking_type:
             return new_picking_type
 
         # Fall back to matching by operation type code
-        new_picking_type = self.env["stock.picking.type"].search([
-            ("warehouse_id", "=", new_warehouse.id),
-            ("code", "=", code),
-        ], limit=1)
+        new_picking_type = self.env["stock.picking.type"].search(
+            [
+                ("warehouse_id", "=", new_warehouse.id),
+                ("code", "=", code),
+            ],
+            limit=1,
+        )
 
         return new_picking_type
 
@@ -302,4 +352,3 @@ class StockPickingChangeWarehouse(models.TransientModel):
 
         # Default to the new picking type's default destination
         return new_picking_type.default_location_dest_id or new_warehouse.lot_stock_id
-
