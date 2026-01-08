@@ -1,4 +1,4 @@
-name: Test Odoo 17 - Stock Picking Cancel Back2Draft
+name: Test Odoo 17 - Stock Picking Change Warehouse
 
 on:
   push:
